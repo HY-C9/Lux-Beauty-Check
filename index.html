@@ -202,7 +202,25 @@
         </div>
     </div>
 
-    <script>
+    <script type="module">
+        // --- 1. โหลด Firebase SDK ---
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+        // --- 2. ใส่ Firebase Config อันเดิม (mombaby-check) ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyD9SnhLqRijMJIsNpStmsPSWrXsiFxn-gs",
+            authDomain: "mombaby-check.firebaseapp.com",
+            projectId: "mombaby-check",
+            storageBucket: "mombaby-check.firebasestorage.app",
+            messagingSenderId: "948432082279",
+            appId: "1:948432082279:web:61b1dfd215c02582f6cbc2",
+            measurementId: "G-MX9SD1GC7P"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
         // --- 🌊 ระบบ Canvas วาดคลื่นน้ำโทนสี Rose Gold ทองๆ ---
         const canvas = document.getElementById('water-canvas');
         const ctx = canvas.getContext('2d');
@@ -254,42 +272,11 @@
         animateWater();
         // ---------------------------------------------------
 
-        // โครงสร้าง JavaScript API ดึงข้อมูลเดิม
-        const SHEET_API_URL = "https://script.google.com/macros/s/AKfycbwQtzNcnQpyLVepdtqa6Bl9Drvi7e5uRBKLgjFThIHsM8m7BG2tCOs7yX66BseWaQ/exec";
-        let db = [];
+        // ผูกฟังก์ชันเข้ากับ window เพื่อให้ทำงานร่วมกับ onclick ได้
+        window.showPop = function(id) { document.getElementById(id).classList.replace('hidden', 'flex'); }
+        window.hideAll = function() { document.querySelectorAll('.fixed').forEach(el => el.classList.replace('flex', 'hidden')); }
 
-        async function loadData() {
-            try {
-                const response = await fetch(SHEET_API_URL);
-                const data = await response.json();
-                if(Array.isArray(data)) db = data;
-            } catch (e) { console.error("Load Error:", e); }
-        }
-
-        function checkShop() {
-            const input = document.getElementById('shopInput').value.trim();
-            if(!input) return alert("กรุณากรอกชื่อร้านค้า");
-            if(db.length === 0) return alert("ระบบกำลังโหลดข้อมูลหรือยังไม่มีข้อมูลในระบบ กรุณารอสักครู่...");
-
-            const shop = db.find(s => (s.name || "").toString().trim().toLowerCase() === input.toLowerCase());
-            if(!shop) return showPop('notFoundOverlay'); 
-
-            if(shop.status === 'pass') {
-                document.getElementById('pShop').innerText = shop.name;
-                document.getElementById('pOwner').innerText = shop.owner;
-                document.getElementById('pAddr').innerText = shop.addr;
-                
-                document.getElementById('blurSec').classList.add('blur-zone');
-                document.getElementById('unlockBtn').classList.remove('hidden');
-                
-                showPop('passOverlay');
-            } else {
-                document.getElementById('fShop').innerText = `"${shop.name}"`;
-                showPop('failOverlay'); 
-            }
-        }
-
-        function askUnlock() {
+        window.askUnlock = function() {
             const pass = prompt("กรุณากรอกรหัสธุรกรรม เพื่อเปิดดูข้อมูลนี้:");
             if(pass === "123123123") {
                 document.getElementById('blurSec').classList.remove('blur-zone');
@@ -299,11 +286,40 @@
             }
         }
 
-        function showPop(id) { document.getElementById(id).classList.replace('hidden', 'flex'); }
-        function hideAll() { document.querySelectorAll('.fixed').forEach(el => el.classList.replace('flex', 'hidden')); }
-        
-        loadData();
-        setInterval(loadData, 2000);
+        window.checkShop = async function() {
+            const input = document.getElementById('shopInput').value.trim();
+            if(!input) return alert("กรุณากรอกชื่อร้านค้า");
+
+            try {
+                // ค้นหาในโฟลเดอร์ใหม่
+                const q = query(collection(db, "address_mom_baby2"), where("Name", "==", input));
+                const querySnapshot = await getDocs(q);
+
+                if (querySnapshot.empty) {
+                    return window.showPop('notFoundOverlay'); 
+                }
+
+                const shop = querySnapshot.docs[0].data();
+
+                if(shop.Status === 'ผ่าน' || shop.Status === 'ปกติ' || shop.Status === 'pass') {
+                    document.getElementById('pShop').innerText = shop.Name || '-';
+                    document.getElementById('pOwner').innerText = shop.Owner || '-';
+                    document.getElementById('pAddr').innerText = shop.Address || '-';
+                    
+                    document.getElementById('blurSec').classList.add('blur-zone');
+                    document.getElementById('unlockBtn').classList.remove('hidden');
+                    
+                    window.showPop('passOverlay');
+                } else {
+                    document.getElementById('fShop').innerText = `"${shop.Name || input}"`;
+                    window.showPop('failOverlay'); 
+                }
+
+            } catch (error) {
+                console.error("เกิดข้อผิดพลาด:", error);
+                alert("ไม่สามารถดึงข้อมูลได้ กรุณาลองใหม่");
+            }
+        }
     </script>
 </body>
 </html>
